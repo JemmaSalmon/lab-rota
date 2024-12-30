@@ -1,0 +1,65 @@
+import pandas as pd
+import random
+
+# Define the tasks and their properties as extracted from the file
+tasks_data = [
+    {"Task": "Bead Beating", "Number of People": 2, "Consecutive Days": 1, "Frequency": 1, "Days": ["Friday"], "Eligible": ["Graeme", "Amy", "Priyanka", "Raquel", "Ben", "Liz", "Anna", "Jessie", "Halyna"]},
+    {"Task": "Manual DNA extraction", "Number of People": 2, "Consecutive Days": 1, "Frequency": 1, "Days": ["Thursday"], "Eligible": ["Graeme", "Amy", "Priyanka", "Raquel", "Ben", "Liz", "Anna", "Jessie", "Halyna"]},
+    {"Task": "DNA extractions", "Number of People": 2, "Consecutive Days": 1, "Frequency": 1, "Days": ["Tuesday"], "Eligible": ["Graeme", "Amy", "Priyanka", "Raquel", "Ben", "Liz", "Anna", "Jessie", "Halyna"]},
+    {"Task": "Femto", "Number of People": 1, "Consecutive Days": 1, "Frequency": 2, "Days": ["Wednesday", "Friday"], "Eligible": ["Graeme", "Amy", "Priyanka", "Raquel", "Ben", "Liz", "Anna", "Jessie", "Halyna"]},
+    {"Task": "Lab cleaning", "Number of People": 2, "Consecutive Days": 1, "Frequency": 1, "Days": ["Friday"], "Eligible": ["Graeme", "Amy", "Priyanka", "Raquel", "Ben", "Liz", "Anna", "Jessie", "Halyna"]},
+    {"Task": "Shear and SPRI", "Number of People": 1, "Consecutive Days": 1, "Frequency": 1, "Days": ["Thursday"], "Eligible": ["Graeme", "Amy", "Priyanka", "Raquel", "Ben", "Liz", "Anna", "Jessie", "Halyna"]},
+    {"Task": "PiMmS_1", "Number of People": 2, "Consecutive Days": 1, "Frequency": 1, "Days": ["Monday"], "Eligible": ["Anna", "Jessie", "Raquel", "Halyna"]},
+    {"Task": "PiMmS_2", "Number of People": 1, "Consecutive Days": 2, "Frequency": 1, "Days": ["Tuesday", "Wednesday"], "Eligible": ["Anna", "Jessie", "Raquel", "Halyna"]},
+    {"Task": "PiMmS_3", "Number of People": 1, "Consecutive Days": 2, "Frequency": 1, "Days": ["Tuesday", "Wednesday"], "Eligible": ["Anna", "Jessie", "Raquel", "Halyna"]},
+    {"Task": "Sample Prep", "Number of People": 2, "Consecutive Days": 2, "Frequency": 2, "Days": ["Monday", "Tuesday"], "Eligible": ["Graeme", "Amy", "Priyanka", "Raquel", "Ben", "Liz", "Anna", "Jessie", "Halyna"]},
+    {"Task": "RNA extraction", "Number of People": 1, "Consecutive Days": 1, "Frequency": 1, "Days": ["Wednesday"], "Eligible": ["Graeme", "Amy", "Priyanka", "Raquel", "Ben", "Liz", "Anna", "Jessie", "Halyna"]},
+    {"Task": "ULI", "Number of People": 1, "Consecutive Days": 1, "Frequency": 1, "Days": ["Thursday"], "Eligible": ["Graeme", "Amy", "Priyanka", "Raquel", "Ben", "Liz", "Anna", "Jessie", "Halyna"]},
+    {"Task": "Stock check", "Number of People": 1, "Consecutive Days": 1, "Frequency": 1, "Days": ["Friday"], "Eligible": ["Graeme", "Amy", "Priyanka", "Raquel", "Ben", "Liz", "Anna", "Jessie", "Halyna"]},
+    {"Task": "HiC Submission", "Number of People": 1, "Consecutive Days": 1, "Frequency": 1, "Days": ["Monday"], "Eligible": ["Anna", "Jessie"]},
+    {"Task": "Sample selection", "Number of People": 1, "Consecutive Days": 1, "Frequency": 1, "Days": ["Monday"], "Eligible": ["Priyanka"]},
+    {"Task": "LoPOE", "Number of People": 1, "Consecutive Days": 1, "Frequency": 1, "Days": ["Tuesday"], "Eligible": ["Ben"]},
+    {"Task": "LRES submission", "Number of People": 1, "Consecutive Days": 1, "Frequency": 1, "Days": ["Wednesday"], "Eligible": ["Anna", "Jessie"]},
+]
+
+# Create an Excel sheet for an 8-week rota
+weeks = [f"Week {i+1}" for i in range(8)]
+days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+rota_columns = ["Week", "Day", "Task", "Assigned To"]
+rota_rows = []
+
+# Assign tasks while respecting the constraints
+for week in weeks:
+    for day in days:
+        for task_data in tasks_data:
+            if day in task_data["Days"]:
+                assigned = random.sample(task_data["Eligible"], task_data["Number of People"])
+                rota_rows.append({
+                    "Week": week,
+                    "Day": day,
+                    "Task": task_data["Task"],
+                    "Assigned To": ", ".join(assigned)
+                })
+
+# Create the DataFrame
+rota_df = pd.DataFrame(rota_rows, columns=rota_columns)
+
+# Modify Sample Prep to ensure same people are assigned on Monday and Tuesday
+sample_prep_rows = rota_df[(rota_df['Task'] == 'Sample Prep') & (rota_df['Day'].isin(['Monday', 'Tuesday']))]
+for week in sample_prep_rows['Week'].unique():
+    monday_row = sample_prep_rows[(sample_prep_rows['Week'] == week) & (sample_prep_rows['Day'] == 'Monday')]
+    if not monday_row.empty:
+        assigned_people = monday_row.iloc[0]['Assigned To']
+        rota_df.loc[(rota_df['Week'] == week) & (rota_df['Day'] == 'Tuesday') & (rota_df['Task'] == 'Sample Prep'), 'Assigned To'] = assigned_people
+
+# Modify PiMmS to ensure split between PiMmS_2 and PiMmS_3 within a week
+for week in weeks:
+    p1_rows = rota_df[(rota_df['Week'] == week) & (rota_df['Task'] == 'PiMmS_1')]
+    if not p1_rows.empty:
+        p1_assigned = p1_rows.iloc[0]['Assigned To'].split(", ")
+        if len(p1_assigned) == 2:
+            rota_df.loc[(rota_df['Week'] == week) & (rota_df['Task'] == 'PiMmS_2'), 'Assigned To'] = p1_assigned[0]
+            rota_df.loc[(rota_df['Week'] == week) & (rota_df['Task'] == 'PiMmS_3'), 'Assigned To'] = p1_assigned[1]
+
+# Save to Excel
+rota_df.to_excel("8_week_rota_final.xlsx", index=False)
